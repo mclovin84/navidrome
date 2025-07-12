@@ -68,16 +68,16 @@ EOT
 # Build Navidrome
 WORKDIR /workspace
 RUN --mount=type=bind,source=. \
-    --mount=type=cache,id=root-cache,target=/root/.cache \
-    --mount=type=cache,id=go-mod-cache,target=/go/pkg/mod \
+    --mount=type=cache,id=cache:navidrome-root-cache,target=/root/.cache \
+    --mount=type=cache,id=cache:navidrome-go-mod-cache,target=/go/pkg/mod \
     go mod download
 
 ARG GIT_SHA
 ARG GIT_TAG
 
 RUN --mount=type=bind,source=. \
-    --mount=type=cache,id=root-cache,target=/root/.cache \
-    --mount=type=cache,id=go-mod-cache,target=/go/pkg/mod <<EOT
+    --mount=type=cache,id=cache:navidrome-root-cache,target=/root/.cache \
+    --mount=type=cache,id=cache:navidrome-go-mod-cache,target=/go/pkg/mod <<EOT
 
     # Copy UI build to workspace
     cp -r /build ./ui/build
