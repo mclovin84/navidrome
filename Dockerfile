@@ -121,12 +121,15 @@ RUN apk add -U --no-cache ffmpeg mpv sqlite
 # Copy navidrome binary
 COPY --from=build /out/navidrome /app/
 
-ENV ND_MUSICFOLDER=/music
-ENV ND_DATAFOLDER=/data
-ENV ND_CONFIGFILE=/data/navidrome.toml
+ENV ND_MUSICFOLDER=/music/music
+ENV ND_DATAFOLDER=/music/data
+ENV ND_CONFIGFILE=/music/data/navidrome.toml
 ENV ND_PORT=4533
 ENV GODEBUG="asyncpreemptoff=1"
 RUN touch /.nddockerenv
+
+# Create subdirectories for music and data
+RUN mkdir -p /music/music /music/data
 
 EXPOSE ${ND_PORT}
 WORKDIR /app
