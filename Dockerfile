@@ -128,11 +128,11 @@ ENV ND_PORT=4533
 ENV GODEBUG="asyncpreemptoff=1"
 RUN touch /.nddockerenv
 
-# Create subdirectories for music and data
-RUN mkdir -p /music/music /music/data
-
 EXPOSE ${ND_PORT}
 WORKDIR /app
 
-ENTRYPOINT ["/app/navidrome"]
+# Create a startup script that creates directories and starts navidrome
+RUN echo '#!/bin/sh\nmkdir -p /music/music /music/data\n/app/navidrome' > /app/start.sh && chmod +x /app/start.sh
+
+ENTRYPOINT ["/app/start.sh"]
 
