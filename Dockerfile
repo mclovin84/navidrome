@@ -24,40 +24,7 @@ RUN cd /out && \
 FROM scratch AS xx
 COPY --from=xx-build /out/ /usr/bin/
 
-########################################################################################################################
-### Get TagLib
-FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/alpine:3.19 AS taglib-build
-ARG TARGETPLATFORM
-ARG CROSS_TAGLIB_VERSION=2.1.1-1
-ENV CROSS_TAGLIB_RELEASES_URL=https://github.com/navidrome/cross-taglib/releases/download/v${CROSS_TAGLIB_VERSION}/
 
-RUN <<EOT
-    PLATFORM=$(echo ${TARGETPLATFORM} | tr '/' '-')
-    FILE=taglib-${PLATFORM}.tar.gz
-
-    DOWNLOAD_URL=${CROSS_TAGLIB_RELEASES_URL}${FILE}
-    wget ${DOWNLOAD_URL}
-
-    mkdir /taglib
-    tar -xzf ${FILE} -C /taglib
-EOT
-
-########################################################################################################################
-### Build Navidrome UI
-FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/node:lts-alpine AS ui
-WORKDIR /app
-
-# Install node dependencies
-COPY ui/package.json ui/package-lock.json ./
-COPY ui/bin/ ./bin/
-RUN npm ci
-
-# Build bundle
-COPY ui/ ./
-RUN npm run build -- --outDir=/build
-
-FROM scratch AS ui-bundle
-COPY --from=ui /build /build
 
 ########################################################################################################################
 ### Build Navidrome binary
@@ -74,6 +41,32 @@ ARG TARGETPLATFORM
 RUN xx-apt install -y binutils gcc g++ libc6-dev zlib1g-dev
 RUN xx-verify --setup
 
+# Build UI
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+COPY ui/bin/ ./bin/
+RUN npm ci
+COPY ui/ ./
+RUN npm run build -- --outDir=/build
+
+# Get TagLib
+WORKDIR /taglib-download
+ARG CROSS_TAGLIB_VERSION=2.1.1-1
+ENV CROSS_TAGLIB_RELEASES_URL=https://github.com/navidrome/cross-taglib/releases/download/v${CROSS_TAGLIB_VERSION}/
+
+RUN <<EOT
+    PLATFORM=$(echo ${TARGETPLATFORM} | tr '/' '-')
+    FILE=taglib-${PLATFORM}.tar.gz
+
+    DOWNLOAD_URL=${CROSS_TAGLIB_RELEASES_URL}${FILE}
+    wget ${DOWNLOAD_URL}
+
+    mkdir /taglib
+    tar -xzf ${FILE} -C /taglib
+EOT
+
+# Build Navidrome
+WORKDIR /workspace
 RUN --mount=type=bind,source=. \
     --mount=type=cache,id=cache:root-cache,target=/root/.cache \
     --mount=type=cache,id=cache:go-mod-cache,target=/go/pkg/mod \
@@ -83,11 +76,11 @@ ARG GIT_SHA
 ARG GIT_TAG
 
 RUN --mount=type=bind,source=. \
-    --mount=from=ui,source=/build,target=./ui/build,ro \
-    --mount=from=osxcross,src=/osxcross/SDK,target=/xx-sdk,ro \
     --mount=type=cache,id=cache:root-cache,target=/root/.cache \
-    --mount=type=cache,id=cache:go-mod-cache,target=/go/pkg/mod \
-    --mount=from=taglib-build,target=/taglib,src=/taglib,ro <<EOT
+    --mount=type=cache,id=cache:go-mod-cache,target=/go/pkg/mod <<EOT
+
+    # Copy UI build to workspace
+    cp -r /build ./ui/build
 
     # Setup CGO cross-compilation environment
     xx-go --wrap
