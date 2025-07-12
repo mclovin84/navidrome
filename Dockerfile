@@ -33,6 +33,16 @@ RUN apt-get update && apt-get install -y clang lld
 COPY --from=xx / /
 WORKDIR /workspace
 
+# Build UI
+FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/node:lts-alpine AS ui-build
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+COPY ui/bin/ ./bin/
+RUN npm ci
+COPY ui/ ./
+RUN npm run build -- --outDir=/build
+
+# Build Navidrome
 FROM --platform=$BUILDPLATFORM base AS build
 
 # Install build dependencies for the target platform
@@ -40,14 +50,6 @@ ARG TARGETPLATFORM
 
 RUN xx-apt install -y binutils gcc g++ libc6-dev zlib1g-dev
 RUN xx-verify --setup
-
-# Build UI
-WORKDIR /ui
-COPY ui/package.json ui/package-lock.json ./
-COPY ui/bin/ ./bin/
-RUN npm ci
-COPY ui/ ./
-RUN npm run build -- --outDir=/build
 
 # Get TagLib
 WORKDIR /taglib-download
@@ -65,9 +67,9 @@ RUN <<EOT
     tar -xzf ${FILE} -C /taglib
 EOT
 
-# Build Navidrome
 WORKDIR /workspace
 COPY . .
+COPY --from=ui-build /build /build
 RUN go mod download
 
 ARG GIT_SHA
